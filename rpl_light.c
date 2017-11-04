@@ -5,8 +5,6 @@
 #include <proto/dos.h>
 #include <string.h>
 
-//struct Library * DOSBase = NULL;
-//struct DOSIFace *IDOS = NULL;
 
 char *string[1000];
 int string_count = 0;
@@ -15,18 +13,24 @@ char *exclude[1000];
 int exclude_count = 0;
 
 char *include[] = { ".c",".C",".h",".H",NULL };
-char *opts[] ={ "-R", NULL };
+char *opts[] ={ "-R", "-x", NULL };
+
+enum
+{
+	opt_recursive,
+	opt_exclude
+};
 
 char *bigbuffer;	
 int bigbuffer_size = 1024 * 1024 ; // 1MB
 
-BOOL is_correct_file( char *name )
+BOOL file_is_in_list( char *name , char **list )
 {
 	char **i;
 	int name_len = strlen(name);
 	int ext_len;
 
-	for (i = include; *i ; i++)
+	for (i = list; *i ; i++)
 	{
 		ext_len =  strlen( *i );
 		if (name_len - ext_len > 0)
@@ -98,7 +102,7 @@ void replace_text_in_file( char *name, char *from, char *to )
 
 int32 SafeAddPart(char **oldPart, char *newPart)
 {
-	int32 success;
+	int32 success = 0;
 	int size;
 	char *tmp;
 	size = strlen( *oldPart ? *oldPart : "" ) + strlen(newPart) + 2;	// maybe need a / or : , need a null at end of the string.
@@ -143,7 +147,7 @@ int recursive( char *dir )
 	        }
 	        else if( EXD_IS_FILE(dat) )           /* a file */
 	        {
-			if (is_correct_file (dat->Name) )
+			if ( ( file_is_in_list(dat->Name , include) == TRUE) && ( file_is_in_list(dat->Name , exclude) == FALSE) )
 			{
 				char *path_and_file = strdup( recursive_path );
 				
@@ -183,6 +187,12 @@ int recursive( char *dir )
 	if (recursive_path) free(recursive_path);
 }
 
+enum
+{
+	is_string,
+	is_exclude
+};
+
 int main(int args, char **arg)
 {
 	char **opt;
@@ -190,6 +200,7 @@ int main(int args, char **arg)
 	int string_count = 0;
 	int opt_count = 0;
 	BOOL recursive_opt = FALSE;
+	int expected = is_string;
 
 	bigbuffer = malloc (bigbuffer_size);
 	if (!bigbuffer) return 0;
@@ -205,20 +216,35 @@ int main(int args, char **arg)
 				{
 					switch( opt_count )
 					{
-						case 0: 	recursive_opt= TRUE;
+						case opt_recursive: recursive_opt= TRUE;
+								break;
+
+						case opt_exclude:
+								expected = is_exclude;
 								break;
 						default: 
-								printf("found %d but ignored\n",arg[n]);
+								printf("found %s but ignored\n",arg[n]);
 								break;
 					}
 				}
 				opt_count ++;
 			}
 		}
-		else
+		else 
 		{
-			string[string_count] = arg[n];
-			string_count ++;
+			switch (expected)
+			{
+				case is_string:
+					string[string_count] = arg[n];
+					string_count ++;
+					break;
+
+				case is_exclude:
+					exclude[exclude_count] = arg[n];
+					exclude_count ++;
+					expected = is_string;	// reset.
+					break;
+			}	
 		}
 	}
 
