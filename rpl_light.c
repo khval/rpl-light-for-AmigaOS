@@ -13,13 +13,16 @@ char *exclude[1000];
 int exclude_count = 0;
 
 char *include[] = { ".c",".C",".h",".H",NULL };
-char *opts[] ={ "-R", "-x", NULL };
+char *opts[] ={ "-R", "-x", "-q", NULL };
 
 enum
 {
 	opt_recursive,
-	opt_exclude
+	opt_exclude,
+	opt_quiet
 };
+
+BOOL quiet_opt = FALSE;
 
 char *bigbuffer;	
 int bigbuffer_size = 1024 * 1024 ; // 1MB
@@ -90,9 +93,13 @@ void replace_text_in_file( char *name, char *from, char *to )
 			
 			if (changed)
 			{
-				printf("File %s changed\n",name);
+				if (quiet_opt == FALSE)	printf("File %s changed\n",name);
 				remove(name);
 				rename(outfile, name);
+			}
+			else
+			{
+				remove(outfile);
 			}
 
 			free(outfile);
@@ -155,8 +162,7 @@ int recursive( char *dir )
 				{
 					if (SafeAddPart( &path_and_file, dat->Name  ))
 					{
-						Printf("filename=%s\n",  path_and_file ); 
-
+						if (quiet_opt== FALSE)	Printf("filename=%s\n",  path_and_file ); 
 						replace_text_in_file( path_and_file, string[0], string[1] );
 					}
 					free(path_and_file);
@@ -200,6 +206,7 @@ int main(int args, char **arg)
 	int string_count = 0;
 	int opt_count = 0;
 	BOOL recursive_opt = FALSE;
+
 	int expected = is_string;
 
 	bigbuffer = malloc (bigbuffer_size);
@@ -221,6 +228,10 @@ int main(int args, char **arg)
 
 						case opt_exclude:
 								expected = is_exclude;
+								break;
+
+						case  opt_quiet:
+								quiet_opt = TRUE;
 								break;
 						default: 
 								printf("found %s but ignored\n",arg[n]);
